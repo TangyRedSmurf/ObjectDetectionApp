@@ -191,14 +191,25 @@
                     setStatusMessage('Error starting detection: ' + error.message, 'error');
                 }
             } else {
-                isDetecting = false;
-                startDetectionButton.textContent = 'Start Detection';
-                if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
-                    stream = null;
-                }
-                setStatusMessage('Detection stopped.', 'info');
+                stopDetection();
             }
+        }
+
+        function stopDetection() {
+            isDetecting = false;
+            startDetectionButton.textContent = 'Start Detection';
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            // Clear the canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Clear recent detections
+            recentDetections = [];
+            detectionsList.innerHTML = '';
+            setStatusMessage('Detection stopped.', 'info');
+            // Reset video source
+            video.srcObject = null;
         }
 
         async function predictWebcam() {
