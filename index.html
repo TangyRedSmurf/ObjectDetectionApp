@@ -3,10 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Object Detection PWA</title>
+    <title>Camera Permission-Guided Real-time Object Detection</title>
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#4CAF50">
-    <link rel="apple-touch-icon" href="icon-192x192.png">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then((registration) => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    }, (error) => {
+                        console.log('ServiceWorker registration failed: ', error);
+                    });
+            });
+        }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
     <style>
@@ -17,31 +27,27 @@
             align-items: center;
             background-color: #f0f0f0;
             padding: 20px;
-            max-width: 100%;
-            box-sizing: border-box;
         }
         h1, h2 {
             color: #333;
-            text-align: center;
         }
         #webcam-container {
             position: relative;
             margin-top: 20px;
-            width: 100%;
-            max-width: 640px;
+            max-width: 100%;
         }
         #webcam {
             border: 3px solid #333;
             border-radius: 10px;
-            width: 100%;
+            max-width: 100%;
             height: auto;
         }
         #canvas {
             position: absolute;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
+            max-width: 100%;
+            height: auto;
         }
         #recent-detections {
             margin-top: 20px;
@@ -51,7 +57,6 @@
             border: 1px solid #ddd;
             border-radius: 5px;
             padding: 10px;
-            box-sizing: border-box;
         }
         #recent-detections ul {
             list-style-type: none;
@@ -86,9 +91,6 @@
             background-color: #d4edda;
             color: #155724;
             border: 1px solid #c3e6cb;
-            width: 100%;
-            max-width: 640px;
-            box-sizing: border-box;
         }
         #permission-steps {
             margin-top: 20px;
@@ -96,9 +98,6 @@
             background-color: #e9ecef;
             border-radius: 5px;
             display: none;
-            width: 100%;
-            max-width: 640px;
-            box-sizing: border-box;
         }
         #permission-steps ol {
             margin-left: 20px;
@@ -106,7 +105,7 @@
     </style>
 </head>
 <body>
-    <h1>Object Detection PWA</h1>
+    <h1>Real-time Object Detection</h1>
     <div id="webcam-container">
         <video id="webcam" playsinline></video>
         <canvas id="canvas"></canvas>
@@ -129,21 +128,133 @@
     </div>
 
     <script>
-        // (The JavaScript code remains the same as in the previous version)
-        // ... (insert the entire JavaScript code from the previous version here)
-    </script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js')
-                    .then(registration => {
-                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                    })
-                    .catch(err => {
-                        console.log('ServiceWorker registration failed: ', err);
-                    });
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const detectionsList = document.getElementById('detections-list');
+        const requestPermissionButton = document.getElementById('request-permission');
+        const startDetectionButton = document.getElementById('start-detection');
+        const statusMessage = document.getElementById('status-message');
+        const permissionSteps = document.getElementById('permission-steps');
+
+        let recentDetections = [];
+        let isDetecting = false;
+        let stream = null;
+
+        function updateRecentDetections(predictions) {
+            const now = new Date();
+            predictions.forEach(prediction => {
+                recentDetections.push({
+                    object: prediction.class,
+                    confidence: prediction.score,
+                    time: now
+                });
             });
+
+            recentDetections = recentDetections
+                .filter((detection, index, self) =>
+                    index === self.findIndex((t) => t.object === detection.object)
+                )
+                .slice(-5);
+
+            detectionsList.innerHTML = recentDetections.map(detection => 
+                `<li>${detection.object} (${(detection.confidence * 100).toFixed(2)}%) - ${detection.time.toLocaleTimeString()}</li>`
+            ).join('');
         }
+
+        async function requestCameraPermission() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                setStatusMessage('Camera access granted. You can now start detection.', 'info');
+                startDetectionButton.disabled = false;
+                permissionSteps.style.display = 'none';
+            } catch (error) {
+                console.error('Error accessing the camera:', error);
+                setStatusMessage('Camera access denied. Please follow the steps below to enable camera access.', 'error');
+                permissionSteps.style.display = 'block';
+            }
+        }
+
+        async function startDetection() {
+            if (!isDetecting) {
+                try {
+                    if (!stream) {
+                        await requestCameraPermission();
+                    }
+                    video.play();
+                    isDetecting = true;
+                    startDetectionButton.textContent = 'Stop Detection';
+                    setStatusMessage('Detection started.', 'info');
+                    predictWebcam();
+                } catch (error) {
+                    setStatusMessage('Error starting detection: ' + error.message, 'error');
+                }
+            } else {
+                isDetecting = false;
+                startDetectionButton.textContent = 'Start Detection';
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    stream = null;
+                }
+                setStatusMessage('Detection stopped.', 'info');
+            }
+        }
+
+        async function predictWebcam() {
+            if (!isDetecting) return;
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            const predictions = await model.detect(video);
+
+            updateRecentDetections(predictions);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            predictions.forEach(prediction => {
+                ctx.strokeStyle = '#00FFFF';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(...prediction.bbox);
+
+                ctx.fillStyle = '#00FFFF';
+                ctx.font = '18px Arial';
+                ctx.fillText(
+                    `${prediction.class} (${Math.round(prediction.score * 100)}%)`,
+                    prediction.bbox[0],
+                    prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10
+                );
+            });
+
+            requestAnimationFrame(predictWebcam);
+        }
+
+        function setStatusMessage(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.style.display = 'block';
+            if (type === 'error') {
+                statusMessage.style.backgroundColor = '#f8d7da';
+                statusMessage.style.color = '#721c24';
+                statusMessage.style.borderColor = '#f5c6cb';
+            } else {
+                statusMessage.style.backgroundColor = '#d4edda';
+                statusMessage.style.color = '#155724';
+                statusMessage.style.borderColor = '#c3e6cb';
+            }
+        }
+
+        let model;
+        cocoSsd.load().then(loadedModel => {
+            model = loadedModel;
+            requestPermissionButton.disabled = false;
+            setStatusMessage('Model loaded. Click "Request Camera Permission" to begin.', 'info');
+        }).catch(error => {
+            setStatusMessage('Error loading the model: ' + error.message, 'error');
+        });
+
+        requestPermissionButton.addEventListener('click', requestCameraPermission);
+        startDetectionButton.addEventListener('click', startDetection);
     </script>
 </body>
 </html>
