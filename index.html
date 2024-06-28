@@ -132,27 +132,6 @@
         let stream = null;
         let currentFacingMode = 'user'; // start with front camera
 
-        function updateRecentDetections(predictions) {
-            const now = new Date();
-            predictions.forEach(prediction => {
-                recentDetections.push({
-                    object: prediction.class,
-                    confidence: prediction.score,
-                    time: now
-                });
-            });
-
-            recentDetections = recentDetections
-                .filter((detection, index, self) =>
-                    index === self.findIndex((t) => t.object === detection.object)
-                )
-                .slice(-5);
-
-            detectionsList.innerHTML = recentDetections.map(detection => 
-                `<li>${detection.object} (${(detection.confidence * 100).toFixed(2)}%) - ${detection.time.toLocaleTimeString()}</li>`
-            ).join('');
-        }
-
         async function requestCameraPermission() {
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } });
@@ -183,79 +162,94 @@
                     setStatusMessage('Error starting detection: ' + error.message, 'error');
                 }
             } else {
-                isDetecting = false;
-                startDetectionButton.textContent = 'Start Detection';
-                if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
-                    stream = null;
-                }
-                setStatusMessage('Detection stopped.', 'info');
+                stopDetection();
             }
         }
 
         async function switchCamera() {
             if (stream) {
+                stopDetection(); // Stop detection before switching
                 stream.getTracks().forEach(track => track.stop());
             }
             currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
             await requestCameraPermission();
-            if (isDetecting) {
-                video.play();
-                predictWebcam();
-            }
         }
 
         async function predictWebcam() {
-            if (!isDetecting || !stream || video.srcObject !== stream) return; // Check if stream is active and matches video source
+            if (!isDetecting || !stream || video.srcObject !== stream) {
+                return stopDetection(); // Stop detection if conditions are not met
+            }
 
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
 
-            const predictions = await model.detect(video);
+            try {
+                const predictions = await cocoSsd.detect(video);
 
-            updateRecentDetections(predictions);
+                updateRecentDetections(predictions);
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
 
                 predictions.forEach(prediction => {
-                ctx.strokeStyle = '#00FFFF';
-                ctx.lineWidth = 4;
-                ctx.strokeRect(...prediction.bbox);
+                    ctx.strokeStyle = '#00FFFF';
+                    ctx.lineWidth = 4;
+                    ctx.strokeRect(...prediction.bbox);
 
-                ctx.fillStyle = '#00FFFF';
-                ctx.font = '18px Arial';
-                ctx.fillText(
-                    `${prediction.class} (${Math.round(prediction.score * 100)}%)`,
-                    prediction.bbox[0],
-                    prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10
-            );
-    });
+                    ctx.fillStyle = '#00FFFF';
+                    ctx.font = '18px Arial';
+                    ctx.fillText(
+                        `${prediction.class} (${Math.round(prediction.score * 100)}%)`,
+                        prediction.bbox[0],
+                        prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10
+                    );
+                });
 
-    requestAnimationFrame(predictWebcam);
-}
-
-        function setStatusMessage(message, type) {
-            statusMessage.textContent = message;
-            statusMessage.style.display = 'block';
-            if (type === 'error') {
-                statusMessage.style.backgroundColor = '#f8d7da';
-                statusMessage.style.color = '#721c24';
-                statusMessage.style.borderColor = '#f5c6cb';
-            } else {
-                statusMessage.style.backgroundColor = '#d4edda';
-                statusMessage.style.color = '#155724';
-                statusMessage.style.borderColor = '#c3e6cb';
+                requestAnimationFrame(predictWebcam);
+            } catch (error) {
+                setStatusMessage('Error detecting objects: ' + error.message, 'error');
+                stopDetection(); // Stop detection on error
             }
         }
 
+        function updateRecentDetections(predictions) {
+            const now = new Date();
+            recentDetections = predictions.map(prediction => ({
+                object: prediction.class,
+                confidence: prediction.score,
+                time: now.toLocaleTimeString()
+            }));
+
+            renderDetections();
+        }
+
+        function renderDetections() {
+            detectionsList.innerHTML = recentDetections.map(detection =>
+                `<li>${detection.object} (${(detection.confidence * 100).toFixed(2)}%) - ${detection.time}</li>`
+            ).join('');
+        }
+
+        function stopDetection() {
+            isDetecting = false;
+            startDetectionButton.textContent = 'Start Detection';
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            setStatusMessage('Detection stopped.', 'info');
+        }
+
         let model;
-        cocoSsd.load().then(loadedModel => {
-            model = loadedModel;
-            requestPermissionButton.disabled = false;
-            setStatusMessage('Model loaded. Click "Request Camera Permission" to begin.', 'info');
-        }).catch(error => {
-            setStatusMessage('Error loading the model: ' + error.message, 'error');
-        });
+        async function loadModel() {
+            try {
+                model = await cocoSsd.load();
+                requestPermissionButton.disabled = false;
+                setStatusMessage('Model loaded. Click "Request Camera Permission" to begin.', 'info');
+            } catch (error) {
+                setStatusMessage('Error loading the model: ' + error.message, 'error');
+            }
+        }
+
+        loadModel();
 
         requestPermissionButton.addEventListener('click', requestCameraPermission);
         startDetectionButton.addEventListener('click', startDetection);
