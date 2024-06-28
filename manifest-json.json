@@ -1,10 +1,10 @@
 {
-    "name": "Object Detection PWA",
-    "short_name": "ObjectDetect",
-    "description": "Real-time object detection using your camera",
-    "start_url": "/index.html",
+    "name": "Real-time Object Detection",
+    "short_name": "Object Detection",
+    "description": "A web app for real-time object detection using the camera.",
+    "start_url": ".",
     "display": "standalone",
-    "background_color": "#f0f0f0",
+    "background_color": "#ffffff",
     "theme_color": "#4CAF50",
     "icons": [
         {
