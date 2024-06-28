@@ -5,18 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Real-time Object Detection</title>
     <link rel="manifest" href="manifest.json">
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js')
-                    .then((registration) => {
-                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                    }, (error) => {
-                        console.log('ServiceWorker registration failed: ', error);
-                    });
-            });
-        }
-    </script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
     <style>
@@ -105,13 +93,14 @@
     </style>
 </head>
 <body>
-    <h1>Real-time Object Detection</h1>
+    <h1>Camera Permission-Guided Real-time Object Detection</h1>
     <div id="webcam-container">
         <video id="webcam" playsinline></video>
         <canvas id="canvas"></canvas>
     </div>
     <button id="request-permission">Request Camera Permission</button>
     <button id="start-detection" disabled>Start Detection</button>
+    <button id="switch-camera" disabled>Switch Camera</button>
     <div id="status-message"></div>
     <div id="permission-steps">
         <h3>How to enable camera access:</h3>
@@ -134,12 +123,14 @@
         const detectionsList = document.getElementById('detections-list');
         const requestPermissionButton = document.getElementById('request-permission');
         const startDetectionButton = document.getElementById('start-detection');
+        const switchCameraButton = document.getElementById('switch-camera');
         const statusMessage = document.getElementById('status-message');
         const permissionSteps = document.getElementById('permission-steps');
 
         let recentDetections = [];
         let isDetecting = false;
         let stream = null;
+        let currentFacingMode = 'user'; // start with front camera
 
         function updateRecentDetections(predictions) {
             const now = new Date();
@@ -164,10 +155,11 @@
 
         async function requestCameraPermission() {
             try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } });
                 video.srcObject = stream;
                 setStatusMessage('Camera access granted. You can now start detection.', 'info');
                 startDetectionButton.disabled = false;
+                switchCameraButton.disabled = false;
                 permissionSteps.style.display = 'none';
             } catch (error) {
                 console.error('Error accessing the camera:', error);
@@ -198,6 +190,18 @@
                     stream = null;
                 }
                 setStatusMessage('Detection stopped.', 'info');
+            }
+        }
+
+        async function switchCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+            await requestCameraPermission();
+            if (isDetecting) {
+                video.play();
+                predictWebcam();
             }
         }
 
@@ -255,6 +259,8 @@
 
         requestPermissionButton.addEventListener('click', requestCameraPermission);
         startDetectionButton.addEventListener('click', startDetection);
+        switchCameraButton.addEventListener('click', switchCamera);
     </script>
 </body>
 </html>
+
