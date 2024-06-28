@@ -130,12 +130,10 @@
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const detectionsList = document.getElementById('detections-list');
         const toggleDetectionButton = document.getElementById('toggle-detection');
         const statusMessage = document.getElementById('status-message');
         const permissionSteps = document.getElementById('permission-steps');
 
-        let recentDetections = [];
         let isDetecting = false;
         let stream = null;
         let model = null;
@@ -146,7 +144,7 @@
                 stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 video.srcObject = stream;
                 setStatusMessage('Camera access granted. You can now start detection.', 'info');
-                toggleDetectionButton.textContent = 'Stop Detection';
+                toggleDetectionButton.textContent = 'Start Detection';
                 toggleDetectionButton.disabled = false;
                 permissionSteps.style.display = 'none';
             } catch (error) {
@@ -198,8 +196,6 @@
 
             const predictions = await model.detect(video);
 
-            updateRecentDetections(predictions);
-
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             predictions.forEach(prediction => {
@@ -221,7 +217,7 @@
             }
         }
 
-        function setStatusMessage(message, type) {
+        async function setStatusMessage(message, type) {
             statusMessage.textContent = message;
             statusMessage.style.display = 'block';
             if (type === 'error') {
