@@ -93,7 +93,7 @@
     </style>
 </head>
 <body>
-    <h1>Camera Permission-Guided Real-time Object Detection</h1>
+    <h1>Real-time Object Detection</h1>
     <div id="webcam-container">
         <video id="webcam" playsinline></video>
         <canvas id="canvas"></canvas>
@@ -206,7 +206,7 @@
         }
 
         async function predictWebcam() {
-            if (!isDetecting) return;
+            if (!isDetecting || !stream || video.srcObject !== stream) return; // Check if stream is active and matches video source
 
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
@@ -217,7 +217,7 @@
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            predictions.forEach(prediction => {
+                predictions.forEach(prediction => {
                 ctx.strokeStyle = '#00FFFF';
                 ctx.lineWidth = 4;
                 ctx.strokeRect(...prediction.bbox);
@@ -228,11 +228,11 @@
                     `${prediction.class} (${Math.round(prediction.score * 100)}%)`,
                     prediction.bbox[0],
                     prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10
-                );
-            });
+            );
+    });
 
-            requestAnimationFrame(predictWebcam);
-        }
+    requestAnimationFrame(predictWebcam);
+}
 
         function setStatusMessage(message, type) {
             statusMessage.textContent = message;
