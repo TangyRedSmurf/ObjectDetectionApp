@@ -14,10 +14,11 @@
             margin: 0;
             padding: 20px;
         }
-        h1 { color: #333; }
+        h1, h2 { color: #333; }
         #webcam-container { 
             position: relative; 
             width: 640px; 
+            height: 480px;
             margin: 20px auto; 
         }
         #webcam, #canvas { 
@@ -42,12 +43,22 @@
             background-color: #cccccc;
             cursor: not-allowed;
         }
-        #status, #detections { 
-            margin: 10px 0;
+        #status, #detections, #recent-detections { 
+            margin: 10px auto;
             padding: 10px;
             background-color: #fff;
             border: 1px solid #ddd;
             border-radius: 5px;
+            max-width: 640px;
+        }
+        #recent-detections ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        #recent-detections li {
+            margin-bottom: 5px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
         }
     </style>
 </head>
@@ -62,6 +73,10 @@
     </div>
     <div id="status"></div>
     <div id="detections"></div>
+    <div id="recent-detections">
+        <h2>Recent Detections</h2>
+        <ul id="detections-list"></ul>
+    </div>
 
     <script>
         const video = document.getElementById('webcam');
@@ -70,9 +85,11 @@
         const startStopButton = document.getElementById('start-stop');
         const statusDiv = document.getElementById('status');
         const detectionsDiv = document.getElementById('detections');
+        const detectionsList = document.getElementById('detections-list');
 
         let model;
         let isDetecting = false;
+        let recentDetections = [];
 
         // Load the model
         cocoSsd.load().then(loadedModel => {
@@ -121,6 +138,8 @@
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             detectionsDiv.textContent = '';
+            recentDetections = [];
+            updateRecentDetections();
         }
 
         async function detectFrame() {
@@ -147,7 +166,30 @@
 
             detectionsDiv.textContent = predictions.map(p => `${p.class}: ${Math.round(p.score * 100)}%`).join(', ');
 
+            updateRecentDetections(predictions);
+
             requestAnimationFrame(detectFrame);
+        }
+
+        function updateRecentDetections(predictions = []) {
+            const now = new Date();
+            predictions.forEach(prediction => {
+                recentDetections.push({
+                    object: prediction.class,
+                    confidence: prediction.score,
+                    time: now
+                });
+            });
+
+            recentDetections = recentDetections
+                .filter((detection, index, self) =>
+                    index === self.findIndex((t) => t.object === detection.object)
+                )
+                .slice(-5);
+
+            detectionsList.innerHTML = recentDetections.map(detection => 
+                `<li>${detection.object} (${(detection.confidence * 100).toFixed(2)}%) - ${detection.time.toLocaleTimeString()}</li>`
+            ).join('');
         }
     </script>
 </body>
