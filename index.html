@@ -140,6 +140,7 @@
         let recentDetections = [];
         let isDetecting = false;
         let stream = null;
+        let animationFrameId = null;
 
         function updateRecentDetections(predictions) {
             const now = new Date();
@@ -191,22 +192,26 @@
                     setStatusMessage('Error starting detection: ' + error.message, 'error');
                 }
             } else {
-                isDetecting = false;
-                startDetectionButton.textContent = 'Start Detection';
-                // Stop video stream and any ongoing prediction
-                if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
-                    stream = null;
-                }
-                setStatusMessage('Detection stopped.', 'info');
-                // Clear canvas when stopping detection
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                stopDetection();
             }
         }
 
-        async function predictWebcam() {
-            if (!isDetecting) return;
+        function stopDetection() {
+            isDetecting = false;
+            startDetectionButton.textContent = 'Start Detection';
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            setStatusMessage('Detection stopped.', 'info');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
 
+        async function predictWebcam() {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
 
@@ -231,7 +236,7 @@
             });
 
             if (isDetecting) {
-                requestAnimationFrame(predictWebcam);
+                animationFrameId = requestAnimationFrame(predictWebcam);
             }
         }
 
@@ -263,3 +268,4 @@
     </script>
 </body>
 </html>
+
