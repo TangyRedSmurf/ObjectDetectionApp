@@ -83,9 +83,25 @@
             text-align: center;
         }
 
-        #detections-list {
-            list-style-type: none;
-            padding: 0;
+        #recent-detections {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        table {
+            width: 100%;
+            max-width: 600px;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 8px;
+            border: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #f2f2f2;
             text-align: left;
         }
     </style>
@@ -107,7 +123,18 @@
         <div id="detections"></div>
         <div id="recent-detections">
             <h2>Recent Detections</h2>
-            <ul id="detections-list"></ul>
+            <table id="detections-table">
+                <thead>
+                    <tr>
+                        <th>Object Name</th>
+                        <th>Confidence %</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody id="detections-body">
+                    <!-- Dynamic content will be added here -->
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -119,7 +146,8 @@
         const switchCameraButton = document.getElementById('switch-camera');
         const statusDiv = document.getElementById('status');
         const detectionsDiv = document.getElementById('detections');
-        const detectionsList = document.getElementById('detections-list');
+        const detectionsTable = document.getElementById('detections-table');
+        const detectionsBody = document.getElementById('detections-body');
 
         let model;
         let isDetecting = false;
@@ -226,27 +254,36 @@
 
         function updateRecentDetections(predictions = []) {
             const now = new Date();
-            predictions.forEach(prediction => {
-                recentDetections.push({
-                    object: prediction.class,
-                    confidence: prediction.score,
-                    time: now
-                });
-            });
+            recentDetections.push(...predictions.map(prediction => ({
+                object: prediction.class,
+                confidence: prediction.score,
+                time: now.toLocaleTimeString()
+            })));
 
             recentDetections = recentDetections
-                .filter((detection, index, self) =>
-                    index === self.findIndex((t) => t.object === detection.object)
-                )
+                .reduce((acc, current) => {
+                    const x = acc.find(item => item.object === current.object);
+                    if (!x) {
+                        return acc.concat([current]);
+                    } else {
+                        return acc;
+                    }
+                }, [])
                 .slice(-5);
 
-            detectionsList.innerHTML = recentDetections.map(detection => 
-                `<li>${detection.object} (${(detection.confidence * 100).toFixed(2)}%) - ${detection.time.toLocaleTimeString()}</li>`
-            ).join('');
+            // Update the table
+            detectionsBody.innerHTML = recentDetections.map(detection => `
+                <tr>
+                    <td>${detection.object}</td>
+                    <td>${(detection.confidence * 100).toFixed(2)}%</td>
+                    <td>${detection.time}</td>
+                </tr>
+            `).join('');
         }
     </script>
 </body>
 </html>
+
 
 
 
