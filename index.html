@@ -182,7 +182,8 @@
                     if (!stream) {
                         await requestCameraPermission();
                     }
-                    video.play();
+                    video.srcObject = stream;
+                    await video.play();
                     isDetecting = true;
                     startDetectionButton.textContent = 'Stop Detection';
                     setStatusMessage('Detection started.', 'info');
@@ -208,12 +209,17 @@
             recentDetections = [];
             detectionsList.innerHTML = '';
             setStatusMessage('Detection stopped.', 'info');
-            // Reset video source
-            video.srcObject = null;
+            // Pause the video instead of setting srcObject to null
+            video.pause();
         }
 
         async function predictWebcam() {
             if (!isDetecting) return;
+
+            // Ensure the video is playing
+            if (video.paused || video.ended) {
+                await video.play();
+            }
 
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
