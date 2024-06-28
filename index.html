@@ -110,7 +110,8 @@
         <video id="webcam" playsinline></video>
         <canvas id="canvas"></canvas>
     </div>
-    <button id="toggle-detection" disabled>Start Detection</button>
+    <button id="request-permission">Request Camera Permission</button>
+    <button id="start-detection" disabled>Start Detection</button>
     <div id="status-message"></div>
     <div id="permission-steps">
         <h3>How to enable camera access:</h3>
@@ -130,22 +131,43 @@
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const toggleDetectionButton = document.getElementById('toggle-detection');
+        const detectionsList = document.getElementById('detections-list');
+        const requestPermissionButton = document.getElementById('request-permission');
+        const startDetectionButton = document.getElementById('start-detection');
         const statusMessage = document.getElementById('status-message');
         const permissionSteps = document.getElementById('permission-steps');
 
+        let recentDetections = [];
         let isDetecting = false;
         let stream = null;
-        let model = null;
-        let animationFrameId = null;
+
+        function updateRecentDetections(predictions) {
+            const now = new Date();
+            predictions.forEach(prediction => {
+                recentDetections.push({
+                    object: prediction.class,
+                    confidence: prediction.score,
+                    time: now
+                });
+            });
+
+            recentDetections = recentDetections
+                .filter((detection, index, self) =>
+                    index === self.findIndex((t) => t.object === detection.object)
+                )
+                .slice(-5);
+
+            detectionsList.innerHTML = recentDetections.map(detection => 
+                `<li>${detection.object} (${(detection.confidence * 100).toFixed(2)}%) - ${detection.time.toLocaleTimeString()}</li>`
+            ).join('');
+        }
 
         async function requestCameraPermission() {
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 video.srcObject = stream;
                 setStatusMessage('Camera access granted. You can now start detection.', 'info');
-                toggleDetectionButton.textContent = 'Start Detection';
-                toggleDetectionButton.disabled = false;
+                startDetectionButton.disabled = false;
                 permissionSteps.style.display = 'none';
             } catch (error) {
                 console.error('Error accessing the camera:', error);
@@ -154,7 +176,7 @@
             }
         }
 
-        async function toggleDetection() {
+        async function startDetection() {
             if (!isDetecting) {
                 try {
                     if (!stream) {
@@ -162,30 +184,21 @@
                     }
                     video.play();
                     isDetecting = true;
-                    toggleDetectionButton.textContent = 'Stop Detection';
+                    startDetectionButton.textContent = 'Stop Detection';
                     setStatusMessage('Detection started.', 'info');
                     predictWebcam();
                 } catch (error) {
                     setStatusMessage('Error starting detection: ' + error.message, 'error');
                 }
             } else {
-                stopDetection();
+                isDetecting = false;
+                startDetectionButton.textContent = 'Start Detection';
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    stream = null;
+                }
+                setStatusMessage('Detection stopped.', 'info');
             }
-        }
-
-        function stopDetection() {
-            isDetecting = false;
-            toggleDetectionButton.textContent = 'Start Detection';
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
-                animationFrameId = null;
-            }
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                stream = null;
-            }
-            setStatusMessage('Detection stopped.', 'info');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
 
         async function predictWebcam() {
@@ -195,6 +208,8 @@
             canvas.height = video.videoHeight;
 
             const predictions = await model.detect(video);
+
+            updateRecentDetections(predictions);
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -212,12 +227,10 @@
                 );
             });
 
-            if (isDetecting) {
-                animationFrameId = requestAnimationFrame(predictWebcam);
-            }
+            requestAnimationFrame(predictWebcam);
         }
 
-        async function setStatusMessage(message, type) {
+        function setStatusMessage(message, type) {
             statusMessage.textContent = message;
             statusMessage.style.display = 'block';
             if (type === 'error') {
@@ -231,19 +244,17 @@
             }
         }
 
-        async function loadModel() {
-            try {
-                model = await cocoSsd.load();
-                toggleDetectionButton.disabled = false;
-                setStatusMessage('Model loaded. Click "Start Detection" to begin.', 'info');
-            } catch (error) {
-                setStatusMessage('Error loading the model: ' + error.message, 'error');
-            }
-        }
+        let model;
+        cocoSsd.load().then(loadedModel => {
+            model = loadedModel;
+            requestPermissionButton.disabled = false;
+            setStatusMessage('Model loaded. Click "Request Camera Permission" to begin.', 'info');
+        }).catch(error => {
+            setStatusMessage('Error loading the model: ' + error.message, 'error');
+        });
 
-        loadModel();
-
-        toggleDetectionButton.addEventListener('click', toggleDetection);
+        requestPermissionButton.addEventListener('click', requestCameraPermission);
+        startDetectionButton.addEventListener('click', startDetection);
     </script>
 </body>
 </html>
