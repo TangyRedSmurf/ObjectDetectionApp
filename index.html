@@ -7,28 +7,33 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
     <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            text-align: center; 
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
             background-color: #f0f0f0;
             margin: 0;
-            padding: 20px;
+            padding: 10px; /* Adjusted padding */
         }
-        h1, h2 { color: #333; }
-        #webcam-container { 
-            position: relative; 
-            width: 640px; 
-            height: 480px;
-            margin: 20px auto; 
+        h1, h2 {
+            color: #333;
         }
-        #webcam, #canvas { 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
+        #webcam-container {
+            margin: 20px auto; /* Centering the container */
+            max-width: 100%; /* Ensure it doesn't exceed screen width */
+            overflow: hidden; /* Prevent video overflow */
+        }
+        #webcam {
+            width: 100%; /* Make the video fill container */
+            height: auto; /* Maintain aspect ratio */
             border: 3px solid #333;
             border-radius: 10px;
         }
-        #controls { margin: 20px 0; }
+        #canvas {
+            display: none; /* Hide canvas on mobile (not needed) */
+        }
+        #controls {
+            margin: 10px 0; /* Adjusted margin */
+        }
         #start-stop {
             padding: 10px 20px;
             font-size: 16px;
@@ -38,22 +43,26 @@
             border-radius: 5px;
             cursor: pointer;
         }
-        #start-stop:hover { background-color: #45a049; }
-        #start-stop:disabled { 
+        #start-stop:hover {
+            background-color: #45a049;
+        }
+        #start-stop:disabled {
             background-color: #cccccc;
             cursor: not-allowed;
         }
-        #status, #detections, #recent-detections { 
+        #status, #detections, #recent-detections {
             margin: 10px auto;
             padding: 10px;
             background-color: #fff;
             border: 1px solid #ddd;
             border-radius: 5px;
-            max-width: 640px;
+            max-width: 100%; /* Adjusted max-width */
+            overflow: hidden; /* Ensure content doesn't overflow on smaller screens */
         }
         #recent-detections ul {
             list-style-type: none;
             padding: 0;
+            margin: 0;
         }
         #recent-detections li {
             margin-bottom: 5px;
@@ -65,8 +74,8 @@
 <body>
     <h1>Real-time Object Detection</h1>
     <div id="webcam-container">
-        <video id="webcam" width="640" height="480" autoplay playsinline></video>
-        <canvas id="canvas" width="640" height="480"></canvas>
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
     </div>
     <div id="controls">
         <button id="start-stop" disabled>Start Detection</button>
