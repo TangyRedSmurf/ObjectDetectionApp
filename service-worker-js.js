@@ -4,6 +4,12 @@ const urlsToCache = [
     '/index.html',
     '/style.css', // Add your CSS file if you have one
     '/script.js', // Add your JS file if you have one
+    '/manifest.json',
+    '/icon-192x192.png',
+    '/icon-512x512.png',
+    '/icon-180x180.png',
+    '/icon-167x167.png',
+    '/icon-152x152.png',
     'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs',
     'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd'
 ];
