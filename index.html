@@ -110,8 +110,16 @@
             text-align: left;
         }
 
-        #install-button {
+        #install-container {
             display: none;
+            width: 100%;
+            max-width: 600px;
+            margin: 10px auto;
+            text-align: center;
+        }
+
+        #install-button {
+            display: inline-block;
             margin: 10px auto;
             padding: 10px 20px;
             font-size: 16px;
@@ -130,7 +138,9 @@
 <body>
     <div class="header-container">
         <h1>Real-time Object Detection</h1>
-        <button id="install-button">Install App</button>
+        <div id="install-container">
+            <button id="install-button">Install App</button>
+        </div>
     </div>
     <div class="content-container">
         <div id="webcam-container">
@@ -310,11 +320,11 @@
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            document.getElementById('install-button').style.display = 'block';
+            document.getElementById('install-container').style.display = 'block';
         });
 
         document.getElementById('install-button').addEventListener('click', (e) => {
-            document.getElementById('install-button').style.display = 'none';
+            document.getElementById('install-container').style.display = 'none';
             deferredPrompt.prompt();
             deferredPrompt.userChoice.then((choiceResult) => {
                 if (choiceResult.outcome === 'accepted') {
@@ -325,6 +335,16 @@
                 deferredPrompt = null;
             });
         });
+
+        // Check if the app is already installed
+        window.addEventListener('appinstalled', (evt) => {
+            document.getElementById('install-container').style.display = 'none';
+        });
+
+        // Check if the app is running in standalone mode (already installed)
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            document.getElementById('install-container').style.display = 'none';
+        }
     </script>
 
     <script>
